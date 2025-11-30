@@ -1,0 +1,68 @@
+//secopsdeskincidents//
+
+//A centralized database for storing, tracking, and managing all security incidents reported through the SecOps Desk bot. This includes incident type, severity, reporter details, timestamps, and descriptions—used for SOC operations and analytics.//
+
+//Sample script to add record //
+values_map = Map(); 
+values_map.put("severity", "ABC"); 
+values_map.put("date", "ABC"); 
+values_map.put("incidentid", "ABC"); 
+values_map.put("description", "ABC"); 
+values_map.put("reportedby", "ABC"); 
+values_map.put("incidenttype", "ABC"); 
+response_map=zoho.cliq.createRecord("secopsdeskincidents", values_map); 
+
+
+
+
+//Sample script to fetch the list of records//
+query_map = Map(); 
+criteria_string="severity==ABC"; 
+query_map.put("criteria",criteria_string); 
+response_map=zoho.cliq.getRecords("secopsdeskincidents", query_map); 
+record_id=0; 
+if(response_map.get("status").equalsIgnoreCase("SUCCESS") && response_map.get("list").size()>0){ 
+    record_id=response_map.get("list").get(0).get("id"); 
+} 
+
+
+
+
+//Sample script to get record//
+// To get record with the record id 
+record_id="123456789"; 
+response_map=zoho.cliq.getRecordById("secopsdeskincidents", record_id);
+
+
+
+
+//Sample script to update record//
+values_map = Map(); 
+values_map.put("severity", "ABC"); 
+// Set values for other fields if required 
+query_map = Map(); 
+criteria_string="severity==ABC"; 
+query_map.put("criteria",criteria_string); 
+response_map=zoho.cliq.getRecords("secopsdeskincidents", query_map); 
+record_id=0; 
+if(response_map.get("status").equalsIgnoreCase("SUCCESS") && response_map.get("list").size()>0){ 
+    record_id=response_map.get("list").get(0).get("id"); 
+} 
+if(record_id.length() > 0){ 
+    response_map=zoho.cliq.updateRecord("secopsdeskincidents", record_id, values_map); 
+}
+
+
+
+//Sample script to delete record//
+query_map = Map(); 
+criteria_string="severity==ABC"; 
+query_map.put("criteria",criteria_string); 
+response_map=zoho.cliq.getRecords("secopsdeskincidents", query_map); 
+record_id=0; 
+if(response_map.get("status").equalsIgnoreCase("SUCCESS") && response_map.get("list").size()>0){ 
+    record_id=response_map.get("list").get(0).get("id"); 
+} 
+if(record_id.length() > 0){ 
+    zoho.cliq.deleteRecord("secopsdeskincidents", record_id); 
+} 

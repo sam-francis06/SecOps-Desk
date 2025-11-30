@@ -1,0 +1,12 @@
+
+response = Map();
+if(newuser)
+{
+	message = "👋 Welcome to *SecOps Desk*.\nYour security assistant is ready.\n\nType *help* to get started.";
+}
+else
+{
+	message = "🔐 Welcome back to *SecOps Desk*.\nType *help* anytime.";
+}
+response.put("text",message);
+return response;

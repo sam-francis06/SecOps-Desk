@@ -1,0 +1,412 @@
+
+info user;
+info arguments;
+message = Map();
+if(arguments.get(0) == null)
+{
+	message.put("text","⚠️ Please provide a target to scan.\n\n**Usage Examples:**\n`/scan example.com` — Scan domain\n`/scan 8.8.8.8` — Scan IP address\n`/scan https://example.com` — Scan URL");
+	return message;
+}
+target = arguments.get(0).trim();
+target_type = "domain";
+// Check for URL first
+if(target.contains("://") || target.startsWith("www."))
+{
+	target_type = "url";
+}
+// Check for IP - simple validation: 3 dots, no special chars
+else if(target.getOccurenceCount(".") == 3 && !target.contains("/") && !target.contains(":") && !target.contains("-") && !target.contains("_") && !target.contains("@"))
+{
+	target_type = "ip";
+}
+// Otherwise it's a domain
+
+if(target_type == "url")
+{
+	encoded = zoho.encryption.base64Encode(target);
+	encoded = encoded.replaceAll("=","");
+	encoded = encoded.replaceAll("\\+","-");
+	encoded = encoded.replaceAll("/","_");
+	url_id = encoded;
+	finalResp = invokeurl
+	[
+		url :"https://www.virustotal.com/api/v3/urls/" + url_id
+		type :GET
+		connection:"virustotal_connection"
+	];
+	if(finalResp == null || finalResp.get("data") == null)
+	{
+		message.put("text","❌ No scan data found for URL.\nTry a different URL.");
+		return message;
+	}
+	attr = finalResp.get("data").get("attributes");
+	stats = attr.get("last_analysis_stats");
+	malicious = if(stats.get("malicious") != null,stats.get("malicious"),0);
+	suspicious = if(stats.get("suspicious") != null,stats.get("suspicious"),0);
+	harmless = if(stats.get("harmless") != null,stats.get("harmless"),0);
+	undetected = if(stats.get("undetected") != null,stats.get("undetected"),0);
+	total = malicious + suspicious + harmless + undetected;
+	level = "SAFE ✔";
+	if(malicious > 0)
+	{
+		level = "MALICIOUS ❌";
+	}
+	else if(suspicious > 0)
+	{
+		level = "SUSPICIOUS ❗";
+	}
+	report_link = "[VirusTotal Report](https://www.virustotal.com/gui/url/" + url_id + "/detection)";
+	//-------------------------------------
+	// BUILD FORMATTED URL REPORT
+	//-------------------------------------
+	report = "```\n";
+	report = report + "==============================\n";
+	report = report + "SecOps Desk — URL Threat Analysis\n";
+	report = report + "==============================\n";
+	report = report + "Target URL      : " + target + "\n";
+	report = report + "Threat Level    : " + level + "\n";
+	report = report + "Malicious       : " + malicious + "\n";
+	report = report + "Suspicious      : " + suspicious + "\n";
+	report = report + "Harmless        : " + harmless + "\n";
+	report = report + "Undetected      : " + undetected + "\n";
+	report = report + "Total Detections: " + total + "\n";
+	report = report + "━━━━━━━━━━━━━━━━━━\n";
+	report = report + "VirusTotal Report:\n";
+	report = report + report_link + "\n";
+	report = report + "━━━━━━━━━━━━━━━━━━\n";
+	report = report + "Scan Engine     : VirusTotal\n";
+	report = report + "Analysis Status : Completed\n";
+	report = report + "==============================\n";
+	report = report + "```";
+	message.put("text",report);
+	return message;
+}
+// =====================
+// IP SCAN
+// =====================
+if(target_type == "ip")
+{
+	geo = invokeurl
+	[
+		url :"http://ip-api.com/json/" + target + "?fields=status,country,regionName,city,isp,as,timezone"
+		type :GET
+	];
+	if(geo.get("status") != "success")
+	{
+		message.put("text","❌ Invalid IP address or lookup failed.");
+		return message;
+	}
+	country = geo.get("country");
+	region = geo.get("regionName");
+	city = geo.get("city");
+	org = geo.get("isp");
+	asn = geo.get("as");
+	timezone = geo.get("timezone");
+	abuse_score = "Unknown";
+	total_reports = "Unknown";
+	last_report_clean = "No recent reports";
+	try 
+	{
+		rep = invokeurl
+		[
+			url :"https://api.abuseipdb.com/api/v2/check?ipAddress=" + target + "&maxAgeInDays=90"
+			type :GET
+			connection:"abuseipdb_conn"
+		];
+		data = rep.get("data");
+		abuse_score = if(data.get("abuseConfidenceScore") != null,data.get("abuseConfidenceScore"),0);
+		total_reports = if(data.get("totalReports") != null,data.get("totalReports"),0);
+		last_report = data.get("lastReportedAt");
+		if(last_report != null)
+		{
+			last_report_clean = last_report.replaceAll("T"," ").replaceAll("\\+00:00"," UTC").replaceAll("Z"," UTC");
+		}
+	}
+	catch (e)
+	{
+	}
+	malicious = 0;
+	suspicious = 0;
+	vt_score = "Unknown";
+	vt = invokeurl
+	[
+		url :"https://www.virustotal.com/api/v3/ip_addresses/" + target
+		type :GET
+		connection:"virustotal_connection"
+	];
+	if(vt.get("data") != null)
+	{
+		vt_attr = vt.get("data").get("attributes");
+		stats = vt_attr.get("last_analysis_stats");
+		if(stats != null)
+		{
+			malicious = if(stats.get("malicious") != null,stats.get("malicious"),0);
+			suspicious = if(stats.get("suspicious") != null,stats.get("suspicious"),0);
+		}
+		if(vt_attr.get("reputation") != null)
+		{
+			vt_score = vt_attr.get("reputation").toString();
+		}
+	}
+	abuseScoreNum = 0;
+	if(abuse_score != "Unknown")
+	{
+		try 
+		{
+			abuseScoreNum = abuse_score.toLong();
+		}
+		catch (e)
+		{
+			abuseScoreNum = 0;
+		}
+	}
+	threat = "SAFE 🟢";
+	if(malicious > 0)
+	{
+		threat = "MALICIOUS 🔴";
+	}
+	else if(abuseScoreNum >= 75)
+	{
+		threat = "MALICIOUS 🔴";
+	}
+	else if(suspicious > 0 || abuseScoreNum >= 40)
+	{
+		threat = "SUSPICIOUS 🟡";
+	}
+	vt_report = "https://www.virustotal.com/gui/ip-address/" + target;
+	//-------------------------------------
+	// BUILD FORMATTED IP THREAT REPORT
+	//-------------------------------------
+	report = "```\n";
+	report = report + "==============================\n";
+	report = report + "SecOps Desk — IP Threat Analysis\n";
+	report = report + "==============================\n";
+	report = report + "IP Address      : " + target + "\n";
+	report = report + "Threat Level    : " + threat + "\n";
+	report = report + "VT Malicious    : " + malicious + "\n";
+	report = report + "VT Suspicious   : " + suspicious + "\n";
+	report = report + "VT Reputation   : " + vt_score + "\n";
+	report = report + "━━━━━━━━━━━━━━━━━━\n";
+	report = report + "IP Information:\n";
+	report = report + "Country         : " + country + "\n";
+	report = report + "Region          : " + region + "\n";
+	report = report + "City            : " + city + "\n";
+	report = report + "ISP             : " + org + "\n";
+	report = report + "ASN             : " + asn + "\n";
+	report = report + "Timezone        : " + timezone + "\n";
+	report = report + "━━━━━━━━━━━━━━━━━━\n";
+	report = report + "AbuseIPDB Analysis:\n";
+	report = report + "AbuseIPDB Score : " + abuse_score + "/100\n";
+	report = report + "Total Reports   : " + total_reports + "\n";
+	report = report + "Last Reported   : " + last_report_clean + "\n";
+	report = report + "━━━━━━━━━━━━━━━━━━\n";
+	report = report + "VirusTotal Report:\n";
+	report = report + vt_report + "\n";
+	report = report + "━━━━━━━━━━━━━━━━━━\n";
+	report = report + "Scan Engine     : VirusTotal + AbuseIPDB + IP-Geo\n";
+	report = report + "Analysis Status : Completed\n";
+	report = report + "==============================\n";
+	report = report + "```";
+	message.put("text",report);
+	return message;
+}
+// =====================
+// DOMAIN SCAN
+// =====================
+domain = target.replaceAll("https://","");
+domain = domain.replaceAll("http://","");
+domain = domain.replaceAll("www.","");
+domain = domain.replaceAll("/","");
+vt = invokeurl
+[
+	url :"https://www.virustotal.com/api/v3/domains/" + domain
+	type :GET
+	connection:"virustotal_connection"
+];
+mal = 0;
+susp = 0;
+threat = "⚪ UNKNOWN";
+sslStatus = "Unknown";
+ip = "Unknown";
+asn = "Unknown";
+hostOrg = "Unknown";
+hostCountry = "Unknown";
+if(vt.containsKey("data"))
+{
+	vt_attr = vt.get("data").get("attributes");
+	stats = vt_attr.get("last_analysis_stats");
+	mal = stats.get("malicious");
+	susp = stats.get("suspicious");
+	if(mal > 5)
+	{
+		threat = "🔴 MALICIOUS";
+	}
+	else if(mal > 0 || susp > 0)
+	{
+		threat = "🟡 SUSPICIOUS";
+	}
+	else if(mal == 0 && susp == 0)
+	{
+		threat = "🟢 SAFE";
+	}
+	if(vt_attr.containsKey("last_https_certificate"))
+	{
+		sslStatus = "Valid SSL";
+	}
+	else
+	{
+		sslStatus = "No SSL Found";
+	}
+	if(vt_attr.containsKey("last_dns_records"))
+	{
+		dnsRec = vt_attr.get("last_dns_records");
+		for each  rec in dnsRec
+		{
+			if(rec.get("type") == "A")
+			{
+				ip = rec.get("value");
+			}
+		}
+	}
+	if(ip != "Unknown")
+	{
+		ipinfo = invokeurl
+		[
+			url :"https://www.virustotal.com/api/v3/ip_addresses/" + ip
+			type :GET
+			connection:"virustotal_connection"
+		];
+		if(ipinfo.containsKey("data"))
+		{
+			ipattr = ipinfo.get("data").get("attributes");
+			if(ipattr.containsKey("as_owner"))
+			{
+				hostOrg = ipattr.get("as_owner");
+			}
+			if(ipattr.containsKey("asn"))
+			{
+				asn = ipattr.get("asn");
+			}
+			if(ipattr.containsKey("country"))
+			{
+				hostCountry = ipattr.get("country");
+			}
+			else if(ipattr.containsKey("country_code"))
+			{
+				hostCountry = ipattr.get("country_code");
+			}
+			else if(ipattr.containsKey("continent"))
+			{
+				hostCountry = ipattr.get("continent");
+			}
+			else if(ipattr.containsKey("location"))
+			{
+				loc = ipattr.get("location");
+				if(loc.containsKey("country"))
+				{
+					hostCountry = loc.get("country");
+				}
+				if(loc.containsKey("country_code"))
+				{
+					hostCountry = loc.get("country_code");
+				}
+			}
+		}
+	}
+}
+whois = invokeurl
+[
+	url :"https://www.whoisxmlapi.com/whoisserver/WhoisService?domainName=" + domain + "&outputFormat=JSON"
+	type :GET
+	connection:"whoisxml_conn"
+];
+whoisData = whois.get("WhoisRecord");
+registrar = "Unknown";
+org = "Unknown";
+created = "Unknown";
+country = "Unknown";
+dnsCount = 0;
+age = "Unknown";
+expires = "Unknown";
+if(whoisData != null)
+{
+	if(whoisData.containsKey("registrarName"))
+	{
+		registrar = whoisData.get("registrarName");
+	}
+	if(whoisData.containsKey("createdDate"))
+	{
+		created = whoisData.get("createdDate");
+	}
+	if(whoisData.containsKey("expiresDate"))
+	{
+		expires = whoisData.get("expiresDate");
+	}
+	if(whoisData.containsKey("estimatedDomainAge"))
+	{
+		age = whoisData.get("estimatedDomainAge") + " days";
+	}
+	if(whoisData.containsKey("registrant"))
+	{
+		regData = whoisData.get("registrant");
+		if(regData.containsKey("organization"))
+		{
+			org = regData.get("organization");
+		}
+		if(regData.containsKey("country"))
+		{
+			country = regData.get("country");
+		}
+	}
+	if(whoisData.containsKey("nameServers"))
+	{
+		nsData = whoisData.get("nameServers");
+		if(nsData.containsKey("hostNames"))
+		{
+			nsList = nsData.get("hostNames");
+			dnsCount = nsList.size();
+		}
+	}
+}
+finalHostCountry = hostCountry;
+if(finalHostCountry == "Unknown" || finalHostCountry == null)
+{
+	finalHostCountry = country;
+}
+// Add VirusTotal report link
+vt_report = "https://www.virustotal.com/gui/domain/" + domain;
+//-------------------------------------
+// BUILD FORMATTED DOMAIN REPORT
+//-------------------------------------
+report = "```\n";
+report = report + "==============================\n";
+report = report + "SecOps Desk — Domain Intelligence Report\n";
+report = report + "==============================\n";
+report = report + "Domain          : " + domain + "\n";
+report = report + "Threat Level    : " + threat + "\n";
+report = report + "Malicious Hits  : " + mal + "\n";
+report = report + "Suspicious Hits : " + susp + "\n";
+report = report + "SSL Status      : " + sslStatus + "\n";
+report = report + "DNS Servers     : " + dnsCount + "\n";
+report = report + "IP Address      : " + ip + "\n";
+report = report + "ASN             : " + asn + "\n";
+report = report + "Network Owner   : " + hostOrg + "\n";
+report = report + "Hosting Country : " + finalHostCountry + "\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "WHOIS Information:\n";
+report = report + "Registrar       : " + registrar + "\n";
+report = report + "Organization    : " + org + "\n";
+report = report + "Country         : " + country + "\n";
+report = report + "Created On      : " + created + "\n";
+report = report + "Expires On      : " + expires + "\n";
+report = report + "Domain Age      : " + age + "\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "VirusTotal Report:\n";
+report = report + vt_report + "\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "Scan Engine     : VirusTotal + WHOIS + DNS\n";
+report = report + "Analysis Status : Completed\n";
+report = report + "==============================\n";
+report = report + "```";
+message.put("text",report);
+return message;

@@ -1,0 +1,110 @@
+
+response = Map();
+text = "";
+if(message.size() > 0)
+{
+	text = message.get(0).toLowerCase().trim();
+}
+
+fullSuggestions = {"list":{{"text":"🚨Report an Incident"},{"text":"❓Help"},{"text":"ℹ️Overview"}}};
+
+if(text.contains("report"))
+{
+	response = {"type":"form","title":"Report an Incident","name":"incidentreport","hint":"Fill in the incident details","button_label":"Submit","inputs":{{"label":"Incident Type","name":"incidenttype","placeholder":"What type of incident?","min_length":"1","max_length":"50","mandatory":true,"type":"text"},{"label":"Severity","name":"severity","type":"radio","mandatory":true,"options":{{"label":"🔴 Critical","value":"critical"},{"label":"🟠 High","value":"high"},{"label":"🟡 Medium","value":"medium"},{"label":"🟢 Low","value":"low"}}},{"label":"Description","name":"description","placeholder":"Describe the incident","min_length":"5","max_length":"213","mandatory":true,"type":"textarea"},{"label":"Reported By","name":"reportedby","placeholder":"Person reporting","min_length":"2","max_length":"50","mandatory":true,"type":"text"}},"action":{"type":"invoke.function","name":"report"}};
+	return response;
+}
+
+if(text == "❓help")
+{
+	response = Map();
+	response.put("text","*🔧 SecOps Desk — Help Menu*\nSelect a command to begin:");
+	bot = Map();
+	bot.put("name","SecOps Desk");
+	bot.put("image","https://i.ibb.co/B5fXGc7D/Sec-Ops-Desk.png");
+	response.put("bot",bot);
+	card = Map();
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	response.put("suggestions",fullSuggestions);
+	slidesList = List();
+	// Table slide
+	tableSlide = Map();
+	tableSlide.put("type","table");
+	tableSlide.put("title","Available Security Commands");
+	data = Map();
+	// Headers
+	headers = List();
+	headers.add("Command");
+	headers.add("Description");
+	data.put("headers",headers);
+	// Rows
+	rows = List();
+	// /scan
+	r1 = Map();
+	r1.put("Command","/scan");
+	r1.put("Description","Scan URLs, IP addresses, or domains for threats.");
+	rows.add(r1);
+	// /cybernews
+	r2 = Map();
+	r2.put("Command","/cybernews");
+	r2.put("Description","Get the latest cybersecurity headlines & threat updates.");
+	rows.add(r2);
+	// /cve
+	r3 = Map();
+	r3.put("Command","/cve <id>");
+	r3.put("Description","Fetch live vulnerability details using a CVE ID.");
+	rows.add(r3);
+	r4 = Map();
+	r4.put("Command","/incident <id>");
+	r4.put("Description","Retrieve incident details from the database using the incident ID.");
+	rows.add(r4);
+	data.put("rows",rows);
+	tableSlide.put("data",data);
+	slidesList.add(tableSlide);
+	response.put("slides",slidesList);
+	return response;
+}
+
+if(text.contains("ℹ️overview") || text.contains("about") || text.contains("version") || text.contains("identity"))
+{
+	response = Map();
+	response.put("text","ℹ️ *SecOps Desk — System Overview*");
+	// BOT IDENTIY
+	bot = Map();
+	bot.put("name","SecOps Desk");
+	bot.put("image","https://i.ibb.co/B5fXGc7D/Sec-Ops-Desk.png");
+	response.put("bot",bot);
+	// CARD THEME
+	card = Map();
+	card.put("theme","modern-inline");
+	response.put("card",card);
+	// SLIDES
+	slidesList = List();
+	// IMAGE SLIDE
+	imgSlide = Map();
+	imgSlide.put("type","images");
+	imgSlide.put("title","SecOps Desk");
+	imgSlide.put("data",{"https://i.ibb.co/B5fXGc7D/Sec-Ops-Desk.png"});
+	slidesList.add(imgSlide);
+	// ABOUT SLIDE (UPDATED)
+	aboutSlide = Map();
+	aboutSlide.put("type","text");
+	aboutSlide.put("data","SecOps Desk is an intelligent SOC assistant designed for Zoho Cliq.\n" + "It streamlines threat investigation, incident reporting, forensic checks, and security automation.\n\n" + "Built to support analysts, responders, and IT teams with fast, actionable security insights.");
+	slidesList.add(aboutSlide);
+	// VERSION SLIDE (UPDATED)
+	versionSlide = Map();
+	versionSlide.put("type","text");
+	versionSlide.put("data","*Version:* 1.0.0\n" + "*Build:* SOC Automation & Threat Intelligence Extension\n" + "*Developer:* Cyberence Labs\n" + "*Capabilities:*\n" + "• Threat Scanning (URL/IP/Domain)\n" + "• Cybersecurity News Intelligence\n" + "• CVE Lookup & Vulnerability Intelligence\n" + "• SOC Analytics & Incident Insights\n");
+	slidesList.add(versionSlide);
+	response.put("slides",slidesList);
+	// SUGGESTIONS
+	response.put("suggestions",fullSuggestions);
+	return response;
+}
+else
+{
+	response.put("text","👋 Hello! I’m *SecOps Desk* — your SOC security assistant.\n\nClick **Configuration** in the bot menu to enable all features.");
+	response.put("suggestions",fullSuggestions);
+	return response;
+}
+return response;

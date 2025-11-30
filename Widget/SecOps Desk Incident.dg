@@ -1,0 +1,336 @@
+
+activeTab = "overview";
+if(!target.isEmpty())
+{
+	tabId = target.get("id");
+	if(tabId != null && tabId != "")
+	{
+		activeTab = tabId;
+	}
+}
+// Fetch records
+query = Map();
+query.put("limit",200);
+resp = zoho.cliq.getRecords("secopsdeskincidents",query);
+// Counters
+total = 0;
+critical = 0;
+high = 0;
+medium = 0;
+low = 0;
+// Store incidents
+recentIncidents = list();
+allIncidents = list();
+reporterCount = Map();
+if(resp.get("status") == "SUCCESS")
+{
+	recs = resp.get("list");
+	total = recs.size();
+	for each  rec in recs
+	{
+		// Count severity
+		sev = rec.get("severity");
+		if(sev != null)
+		{
+			sevLower = sev.toLowerCase();
+			if(sevLower == "critical")
+			{
+				critical = critical + 1;
+			}
+			else if(sevLower == "high")
+			{
+				high = high + 1;
+			}
+			else if(sevLower == "medium")
+			{
+				medium = medium + 1;
+			}
+			else if(sevLower == "low")
+			{
+				low = low + 1;
+			}
+		}
+		// Count reporters
+		reporter = rec.get("reportedby");
+		if(reporter == null || reporter == "")
+		{
+			reporter = "Unknown";
+		}
+		if(reporterCount.containsKey(reporter))
+		{
+			reporterCount.put(reporter,reporterCount.get(reporter) + 1);
+		}
+		else
+		{
+			reporterCount.put(reporter,1);
+		}
+		// Build incident text
+		incId = rec.get("incidentid");
+		if(incId == null)
+		{
+			incId = "-";
+		}
+		incType = rec.get("incidenttype");
+		if(incType == null)
+		{
+			incType = "-";
+		}
+		incSev = rec.get("severity");
+		if(incSev == null)
+		{
+			incSev = "-";
+		}
+		incRep = rec.get("reportedby");
+		if(incRep == null)
+		{
+			incRep = "-";
+		}
+		incDate = rec.get("date");
+		if(incDate == null)
+		{
+			incDate = "-";
+		}
+		incDesc = rec.get("description");
+		if(incDesc == null)
+		{
+			incDesc = "-";
+		}
+		rowMap = Map();
+		rowMap.put("Incident ID",incId);
+		rowMap.put("Incident Type",incType);
+		rowMap.put("Severity",incSev);
+		rowMap.put("Reported By",incRep);
+		rowMap.put("Date",incDate);
+		shortDesc = if(incDesc.length() > 50,incDesc.substring(0,47) + "...",incDesc);
+		rowMap.put("Description",shortDesc);
+		allIncidents.add(rowMap);
+		if(recentIncidents.size() < 5)
+		{
+			recentIncidents.add(rowMap);
+		}
+	}
+}
+sections = list();
+
+// OVERVIEW TAB
+if(activeTab == "overview")
+{
+	elements = list();
+	// STEP 1: Title
+	titleMap = Map();
+	titleMap.put("type","title");
+	titleMap.put("text","SecOps Desk Security Incident Dashboard");
+	elements.add(titleMap);
+	// STEP 2: Subtitle
+	subMap = Map();
+	subMap.put("type","text");
+	subMap.put("text","Real-time overview of all reported security incidents");
+	elements.add(subMap);
+	// STEP 3: Stats
+	statsText = Map();
+	statsText.put("type","text");
+	statsText.put("text","*Total Incidents:* " + total.toString() + " | *Critical:* " + critical.toString() + " | *High:* " + high.toString() + " | *Medium:* " + medium.toString() + " | *Low:* " + low.toString());
+	elements.add(statsText);
+	// STEP 4: Divider
+	div1 = Map();
+	div1.put("type","divider");
+	elements.add(div1);
+	// SIMPLE INSIGHTS (Very Lightweight)
+	// Most Frequent Severity
+	mostFreqSev = "-";
+	sevCountMap = Map();
+	sevCountMap.put("Critical",critical);
+	sevCountMap.put("High",high);
+	sevCountMap.put("Medium",medium);
+	sevCountMap.put("Low",low);
+	// Find highest severity count
+	maxVal = 0;
+	for each  sevKey in sevCountMap.keys()
+	{
+		if(sevCountMap.get(sevKey) > maxVal)
+		{
+			maxVal = sevCountMap.get(sevKey);
+			mostFreqSev = sevKey;
+		}
+	}
+	elements.add({"type":"text","text":"📌 *Most Common Severity:* " + mostFreqSev});
+	// Top Reporter
+	topReporter = "-";
+	topReporterCount = 0;
+	for each  rep in reporterCount.keys()
+	{
+		if(reporterCount.get(rep) > topReporterCount)
+		{
+			topReporter = rep;
+			topReporterCount = reporterCount.get(rep);
+		}
+	}
+	elements.add({"type":"text","text":"📌 *Most Active Reporter:* " + topReporter + " (" + topReporterCount.toString() + ")"});
+	// STEP 5: Recent incidents title
+	recentTitle = Map();
+	recentTitle.put("type","title");
+	recentTitle.put("text","Latest 5 Security Incidents :");
+	elements.add(recentTitle);
+	// STEP 6: Recent incidents table (COMMENTED OUT TO TEST)
+	if(recentIncidents.size() > 0)
+	{
+		incBlock = Map();
+		incBlock.put("type","table");
+		incBlock.put("headers",{"Incident ID","Incident Type","Severity","Reported By","Date","Description"});
+		incBlock.put("rows",recentIncidents);
+		elements.add(incBlock);
+	}
+	// STEP 7: Second Divider (COMMENTED OUT)
+	div2 = Map();
+	div2.put("type","divider");
+	elements.add(div2);
+	// STEP 8: Chart title (COMMENTED OUT)
+	chartTitle = Map();
+	chartTitle.put("type","title");
+	chartTitle.put("text","Severity BreakDown :");
+	elements.add(chartTitle);
+	// STEP 9: Pie chart (COMMENTED OUT)
+	if(total > 0)
+	{
+		chartData = list();
+		if(critical > 0)
+		{
+			c1 = Map();
+			c1.put("label","Critical");
+			c1.put("value",critical);
+			chartData.add(c1);
+		}
+		if(high > 0)
+		{
+			c2 = Map();
+			c2.put("label","High");
+			c2.put("value",high);
+			chartData.add(c2);
+		}
+		if(medium > 0)
+		{
+			c3 = Map();
+			c3.put("label","Medium");
+			c3.put("value",medium);
+			chartData.add(c3);
+		}
+		if(low > 0)
+		{
+			c4 = Map();
+			c4.put("label","Low");
+			c4.put("value",low);
+			chartData.add(c4);
+		}
+		chartStyle = Map();
+		chartStyle.put("preview","pie");
+		chartBlock = Map();
+		chartBlock.put("type","percentage_chart");
+		chartBlock.put("styles",chartStyle);
+		chartBlock.put("data",chartData);
+		elements.add(chartBlock);
+	}
+	// STEP 10: Third Divider (COMMENTED OUT)
+	div3 = Map();
+	div3.put("type","divider");
+	elements.add(div3);
+	// STEP 11: Bar graph title (COMMENTED OUT)
+	barTitle = Map();
+	barTitle.put("type","title");
+	barTitle.put("text","Reporter Activity Overview :");
+	elements.add(barTitle);
+	// STEP 12: Bar Graph – Incidents by Reporter
+	if(reporterCount.size() > 0)
+	{
+		repKeys = reporterCount.keys();
+		valList = list();
+		for each  rep in repKeys
+		{
+			cnt = reporterCount.get(rep);
+			// Trim very long labels (recommended for CLIQ UI)
+			labelText = rep;
+			if(labelText.length() > 20)
+			{
+				labelText = labelText.substring(0,20);
+			}
+			// Correct bar-graph value structure
+			vm = Map();
+			vm.put("label",labelText);
+			// label is allowed for graph values
+			vm.put("value",cnt);
+			// must be a number
+			valList.add(vm);
+		}
+		// Category → required for graph format
+		graphCategory = Map();
+		graphCategory.put("category","Reporters");
+		graphCategory.put("values",valList);
+		graphDataList = list();
+		graphDataList.add(graphCategory);
+		// Final graph block
+		barGraph = Map();
+		barGraph.put("type","graph");
+		barGraph.put("data",graphDataList);
+		barGraph.put("styles",{"preview":"vertical_bar"});
+		elements.add(barGraph);
+	}
+	else
+	{
+		// Graceful fallback instead of sad-face
+		elements.add({"type":"text","text":"No reporter data available."});
+	}
+	sec1 = Map();
+	sec1.put("id","overview");
+	sec1.put("elements",elements);
+	sections.add(sec1);
+}
+// ALL REPORTS TAB
+if(activeTab == "allreports")
+{
+	elements = list();
+	// Title
+	title2 = Map();
+	title2.put("type","title");
+	title2.put("text","Complete Incident Archive");
+	elements.add(title2);
+	// Subtitle
+	sub2 = Map();
+	sub2.put("type","text");
+	sub2.put("text","Full list of all recorded security incidents (Total : " + total + ")");
+	elements.add(sub2);
+	// Divider
+	div4 = Map();
+	div4.put("type","divider");
+	elements.add(div4);
+	// All incidents
+	if(allIncidents.size() > 0)
+	{
+		styleMap3 = Map();
+		styleMap3.put("short",false);
+		allBlock = Map();
+		allBlock.put("type","table");
+		allBlock.put("headers",{"Incident ID","Incident Type","Severity","Reported By","Date","Description"});
+		allBlock.put("rows",allIncidents);
+		elements.add(allBlock);
+	}
+	sec2 = Map();
+	sec2.put("id","allreports");
+	sec2.put("elements",elements);
+	sections.add(sec2);
+}
+// Build tabs
+tabs = list();
+tab1 = Map();
+tab1.put("label","Overview");
+tab1.put("id","overview");
+tabs.add(tab1);
+tab2 = Map();
+tab2.put("label","All Reports");
+tab2.put("id","allreports");
+tabs.add(tab2);
+// Return
+result = Map();
+result.put("type","applet");
+result.put("tabs",tabs);
+result.put("active_tab",activeTab);
+result.put("sections",sections);
+return result;

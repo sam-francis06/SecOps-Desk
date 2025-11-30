@@ -1,0 +1,70 @@
+
+response = Map();
+inputText = "";
+if(arguments.size() > 0)
+{
+	inputText = arguments.get(0).trim();
+}
+if(inputText == null || inputText == "")
+{
+	response.put("text","Usage: `/incident <IncidentID>`\nExample: `/incident INC-20251116132536`");
+	return response;
+}
+searchId = inputText;
+resp = zoho.cliq.getRecords("secopsdeskincidents",{"limit":200});
+found = null;
+if(resp.get("status") == "SUCCESS")
+{
+	recs = resp.get("list");
+	for each  rec in recs
+	{
+		if(rec.get("incidentid") == searchId)
+		{
+			found = rec;
+			break;
+		}
+	}
+}
+if(found == null)
+{
+	response.put("text","No incident found with ID: `" + searchId + "`");
+	return response;
+}
+sev = found.get("severity").toLowerCase();
+sevDisplay = "Unknown";
+if(sev.contains("critical"))
+{
+	sevDisplay = "🔴 Critical";
+}
+else if(sev.contains("high"))
+{
+	sevDisplay = "🟠 High";
+}
+else if(sev.contains("medium"))
+{
+	sevDisplay = "🟡 Medium";
+}
+else if(sev.contains("low"))
+{
+	sevDisplay = "🟢 Low";
+}
+
+report = "```\n";
+report = report + "==============================\n";
+report = report + "SecOps Desk — Security Incident Report\n";
+report = report + "==============================\n";
+report = report + "Incident ID     : " + found.get("incidentid") + "\n";
+report = report + "Severity Level  : " + sevDisplay + "\n";
+report = report + "Incident Type   : " + found.get("incidenttype") + "\n";
+report = report + "Reported By     : " + found.get("reportedby") + "\n";
+report = report + "Date & Time     : " + found.get("date") + "\n";
+report = report + "Status          : Logged\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "Description:\n";
+report = report + found.get("description") + "\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "Report Status   : Retrieved from Database\n";
+report = report + "==============================\n";
+report = report + "```";
+response.put("text",report);
+return response;

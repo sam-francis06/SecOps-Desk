@@ -1,0 +1,249 @@
+
+
+cve_id = arguments;
+if(cve_id == null || cve_id.trim() == "")
+{
+	return {"text":"⚠️ Usage: /cve CVE-2024-3094"};
+}
+
+url = "https://cveawg.mitre.org/api/cve/" + cve_id;
+try 
+{
+	raw = getUrl(url);
+}
+catch (e)
+{
+	return {"text":"❌ Error fetching CVE data: " + e.toString()};
+}
+if(raw == null || raw.trim() == "")
+{
+	return {"text":"❌ MITRE returned empty response."};
+}
+
+try 
+{
+	resp = raw.toMap();
+}
+catch (e)
+{
+	return {"text":"❌ Invalid JSON from MITRE"};
+}
+
+if(resp.containsKey("error"))
+{
+	return {"text":"❌ No data found for **" + cve_id + "**"};
+}
+
+containers = resp.get("containers");
+if(containers == null || !containers.containsKey("cna"))
+{
+	return {"text":"❌ No CNA data present for this CVE."};
+}
+cna = containers.get("cna");
+
+desc = "Not Available";
+try 
+{
+	if(cna.containsKey("descriptions"))
+	{
+		desc_list = cna.get("descriptions");
+		if(desc_list.size() > 0 && desc_list.get(0).containsKey("value"))
+		{
+			desc = desc_list.get(0).get("value");
+			if(desc.length() > 600)
+			{
+				desc = desc.substring(0,597) + "...";
+			}
+		}
+	}
+}
+catch (e)
+{
+	desc = "Error parsing description";
+}
+
+cvss_score = "Not Available";
+severity = "Unknown";
+if(cna.containsKey("metrics"))
+{
+	try 
+	{
+		metrics = cna.get("metrics");
+		for each  m in metrics
+		{
+			if(m.containsKey("cvssV3_1"))
+			{
+				cvss = m.get("cvssV3_1");
+				if(cvss.containsKey("baseScore"))
+				{
+					cvss_score = cvss.get("baseScore").toString();
+				}
+				if(cvss.containsKey("baseSeverity"))
+				{
+					severity = cvss.get("baseSeverity");
+				}
+				break;
+			}
+		}
+	}
+	catch (e)
+	{
+		cvss_score = "Error parsing CVSS";
+	}
+}
+
+sev_badge = "UNKNOWN ⚪";
+if(severity.equalsIgnoreCase("CRITICAL"))
+{
+	sev_badge = "CRITICAL 🔴";
+}
+else if(severity.equalsIgnoreCase("HIGH"))
+{
+	sev_badge = "HIGH 🟠";
+}
+else if(severity.equalsIgnoreCase("MEDIUM"))
+{
+	sev_badge = "MEDIUM 🟡";
+}
+else if(severity.equalsIgnoreCase("LOW"))
+{
+	sev_badge = "LOW 🟢";
+}
+
+cwe_list = "Not Available";
+try 
+{
+	if(cna.containsKey("problemTypes"))
+	{
+		pt = cna.get("problemTypes");
+		tmp_cwe = "";
+		for each  itm in pt
+		{
+			if(itm.containsKey("descriptions"))
+			{
+				descs = itm.get("descriptions");
+				for each  d in descs
+				{
+					if(d.containsKey("cweId"))
+					{
+						tmp_cwe = tmp_cwe + d.get("cweId") + " ";
+					}
+				}
+			}
+		}
+		if(tmp_cwe.trim() != "")
+		{
+			cwe_list = tmp_cwe.trim();
+		}
+	}
+}
+catch (e)
+{
+	cwe_list = "Error parsing CWE";
+}
+
+ref_text = "No References Available";
+try 
+{
+	if(cna.containsKey("references"))
+	{
+		refs = cna.get("references");
+		tmp_ref = "";
+		count = 0;
+		max_refs = 10;
+		for each  r in refs
+		{
+			if(count >= max_refs)
+			{
+				break;
+			}
+			if(r != null && r.containsKey("url"))
+			{
+				link = r.get("url");
+				// Skip email unsubscribe or irrelevant links
+				if(link.contains("unsubscribe") || link.contains("mailto:"))
+				{
+					continue;
+				}
+				// Strip whitespace
+				link = link.trim();
+				// Only valid URLs
+				if(link.startsWith("http"))
+				{
+					count = count + 1;
+					tmp_ref = tmp_ref + count + ". " + link + "\n";
+				}
+			}
+		}
+		if(tmp_ref.trim() != "")
+		{
+			ref_text = tmp_ref;
+		}
+	}
+}
+catch (e)
+{
+	ref_text = "Error parsing references";
+}
+
+affected = "Not Listed";
+try 
+{
+	if(cna.containsKey("affected"))
+	{
+		aff = cna.get("affected");
+		tmp_aff = "";
+		count = 0;
+		for each  a in aff
+		{
+			vendor = "Unknown Vendor";
+			if(a.containsKey("vendor"))
+			{
+				vendor = a.get("vendor");
+			}
+			product = "Unknown Product";
+			if(a.containsKey("product"))
+			{
+				product = a.get("product");
+			}
+			tmp_aff = tmp_aff + "• " + vendor + " - " + product + "\n";
+		}
+		if(tmp_aff.trim() != "")
+		{
+			affected = tmp_aff;
+		}
+	}
+}
+catch (e)
+{
+	affected = "Error parsing affected products";
+}
+
+current_time = zoho.currentdate.toString("dd MMM yyyy");
+
+report = "```\n";
+report = report + "==============================\n";
+report = report + "SecOps Desk — CVE Security Report\n";
+report = report + "==============================\n";
+report = report + "CVE ID          : " + cve_id + "\n";
+report = report + "Severity Level  : " + sev_badge + "\n";
+report = report + "CVSS Score      : " + cvss_score + "\n";
+report = report + "CWE Weakness    : " + cwe_list + "\n";
+report = report + "Retrieved On    : " + current_time + "\n";
+report = report + "Status          : Active\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "Description:\n" + desc + "\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "Affected Vendors/Products:\n" + affected + "\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "References:\n" + ref_text + "\n";
+report = report + "━━━━━━━━━━━━━━━━━━\n";
+report = report + "Report Status   : Completed\n";
+report = report + "==============================\n";
+report = report + "```";
+
+if(report.length() > 4800)
+{
+	report = report.substring(0,4700) + "\n...\n[Report truncated]\n```";
+}
+return {"text":report};

@@ -1,0 +1,228 @@
+
+validationResults = Map();
+failedServices = List();
+safeResponse = {"text":"⚠️ *SecOps Desk Configuration Required*\n\nPlease configure your API keys under:\n*Extensions → SecOps Desk → Connections*\n\nRequired integrations:\n• VirusTotal\n• AbuseIPDB\n• WhoisXML API\n• GNews API","bot":{"name":"SecOps Desk"},"card":{"theme":"modern-inline"}};
+// ----------------------
+// VIRUSTOTAL VALIDATION
+// ----------------------
+try 
+{
+	vtResponse = invokeurl
+	[
+		url :"https://www.virustotal.com/api/v3/ip_addresses/8.8.8.8"
+		type :GET
+		connection:"virustotal_connection"
+	];
+	if(vtResponse != null && vtResponse.containsKey("data"))
+	{
+		validationResults.put("VirusTotal",{"status":"success"});
+	}
+	else
+	{
+		validationResults.put("VirusTotal",{"status":"failed","reason":"Invalid or empty response"});
+		failedServices.add("VirusTotal: Invalid or empty response");
+	}
+}
+catch (e)
+{
+	validationResults.put("VirusTotal",{"status":"error","reason":"Connection failed"});
+	failedServices.add("VirusTotal: " + e);
+}
+// ----------------------
+// ABUSEIPDB VALIDATION
+// ----------------------
+try 
+{
+	abuseResponse = invokeurl
+	[
+		url :"https://api.abuseipdb.com/api/v2/check"
+		type :GET
+		parameters:{"ipAddress":"8.8.8.8","maxAgeInDays":"30"}
+		connection:"abuseipdb_conn"
+	];
+	if(abuseResponse != null && abuseResponse.containsKey("data"))
+	{
+		validationResults.put("AbuseIPDB",{"status":"success"});
+	}
+	else
+	{
+		validationResults.put("AbuseIPDB",{"status":"failed","reason":"Invalid response"});
+		failedServices.add("AbuseIPDB: Invalid response");
+	}
+}
+catch (e)
+{
+	validationResults.put("AbuseIPDB",{"status":"error","reason":"Connection failed"});
+	failedServices.add("AbuseIPDB: " + e);
+}
+// ----------------------
+// WHOISXML VALIDATION
+// ----------------------
+try 
+{
+	whoisResponse = invokeurl
+	[
+		url :"https://www.whoisxmlapi.com/whoisserver/WhoisService"
+		type :GET
+		parameters:{"domainName":"google.com","outputFormat":"JSON"}
+		connection:"whoisxml_conn"
+	];
+	if(whoisResponse != null && whoisResponse.containsKey("WhoisRecord"))
+	{
+		validationResults.put("WhoisXML",{"status":"success"});
+	}
+	else
+	{
+		validationResults.put("WhoisXML",{"status":"failed","reason":"Invalid response"});
+		failedServices.add("WhoisXML: Invalid response");
+	}
+}
+catch (e)
+{
+	validationResults.put("WhoisXML",{"status":"error","reason":"Connection failed"});
+	failedServices.add("WhoisXML: " + e);
+}
+// ----------------------
+// GNEWS VALIDATION
+// ----------------------
+try 
+{
+	gnewsResponse = invokeurl
+	[
+		url :"https://gnews.io/api/v4/search?q=test&lang=en&max=1"
+		type :GET
+		connection:"gnewscyberconnection"
+	];
+	if(gnewsResponse != null && gnewsResponse.containsKey("articles"))
+	{
+		validationResults.put("GNews",{"status":"success"});
+	}
+	else
+	{
+		validationResults.put("GNews",{"status":"failed","reason":"Invalid response"});
+		failedServices.add("GNews: Invalid response");
+	}
+}
+catch (e)
+{
+	validationResults.put("GNews",{"status":"error","reason":"Connection failed"});
+	failedServices.add("GNews: " + e);
+}
+// ----------------------
+// COUNT SUCCESS
+// ----------------------
+successCount = 0;
+for each  service in validationResults.keys()
+{
+	if(validationResults.get(service).get("status") == "success")
+	{
+		successCount = successCount + 1;
+	}
+}
+// ----------------------
+// ALL SUCCESS
+// ----------------------
+if(successCount == 4)
+{
+	channelMessage = "";
+	try 
+	{
+		allChannelsResponse = invokeurl
+		[
+			url :"https://cliq.zoho.com/api/v2/channels"
+			type :GET
+			connection:"cliq_connection"
+		];
+		channelExists = false;
+		channelId = "";
+		targetChannelName = "SecOps Desk Community";
+		if(allChannelsResponse != null && allChannelsResponse.containsKey("channels"))
+		{
+			allChannels = allChannelsResponse.get("channels");
+			for each  ch in allChannels
+			{
+				channelName = ch.get("name");
+				if(channelName != null)
+				{
+					cleanName = channelName;
+					if(cleanName.startsWith("#"))
+					{
+						cleanName = cleanName.subString(1);
+					}
+					if(cleanName.equalsIgnoreCase(targetChannelName))
+					{
+						channelExists = true;
+						channelId = ch.get("channel_id");
+						break;
+					}
+				}
+			}
+		}
+		if(!channelExists)
+		{
+			channelData = {"name":"SecOps Desk Community","description":"Community hub for SecOps threat intelligence, incident collaboration, and security updates.","level":"organization"};
+			createChannelResponse = invokeurl
+			[
+				url :"https://cliq.zoho.com/api/v2/channels"
+				type :POST
+				parameters:channelData.toString()
+				headers:{"Content-Type":"application/json"}
+				connection:"cliq_connection"
+			];
+			if(createChannelResponse.containsKey("channel_id"))
+			{
+				newChannelId = createChannelResponse.get("channel_id");
+				channelMessage = "\n\n📢 *The “SecOps Desk Community” channel has been created for your organization.*\nIt will serve as a central space for security collaboration, threat intelligence updates, and operational communication.";
+			}
+			else
+			{
+				channelMessage = "\n\n⚠️ Channel creation response was unexpected. Please check logs.";
+			}
+		}
+		else
+		{
+			channelMessage = "\n\n *📢 The “SecOps Desk Community” channel already exists.*\nYour organization can continue using it for security collaboration and updates.";
+		}
+	}
+	catch (e)
+	{
+		channelMessage = "\n\n⚠️ Channel operation failed: " + e + "\nPlease ensure the connection has the appropriate Cliq channel permissions.";
+	}
+	// ----------------------
+	// FINAL PROFESSIONAL MESSAGE
+	// ----------------------
+	return {"text":"✅ *SecOps Desk Configuration Successful*\n\n" + "All required security integrations are active and validated.\n\n" + "🟢 VirusTotal — Connected\n" + "🟢 AbuseIPDB — Connected\n" + "🟢 WhoisXML API — Connected\n" + "🟢 GNews — Connected\n" + channelMessage,"bot":{"name":"SecOps Desk"},"card":{"theme":"modern-inline"}};
+}
+// ----------------------
+// PARTIAL CONFIGURATION
+// ----------------------
+else if(successCount > 0)
+{
+	statusText = "⚠️ *SecOps Desk Partial Configuration*\n\n";
+	for each  s in validationResults.keys()
+	{
+		infoMap = validationResults.get(s);
+		if(infoMap.get("status") == "success")
+		{
+			statusText = statusText + "🟢 " + s + " — Active\n";
+		}
+		else
+		{
+			statusText = statusText + "🔴 " + s + " — " + infoMap.get("reason") + "\n";
+		}
+	}
+	statusText = statusText + "\nPlease correct the failed integrations under:\n*Extensions → SecOps Desk → Connections*.";
+	return {"text":statusText,"bot":{"name":"SecOps Desk"},"card":{"theme":"modern-inline"}};
+}
+// ----------------------
+// ALL FAILED
+// ----------------------
+else
+{
+	debugText = "\n\n*Debug Information:*\n";
+	for each  f in failedServices
+	{
+		debugText = debugText + "• " + f + "\n";
+	}
+	return {"text":safeResponse.get("text") + debugText,"bot":{"name":"SecOps Desk"},"card":{"theme":"modern-inline"}};
+}

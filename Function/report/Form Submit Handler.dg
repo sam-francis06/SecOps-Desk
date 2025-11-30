@@ -1,0 +1,84 @@
+
+response = Map();
+formValues = form.get("values");
+// Fetch form fields
+incident_type = formValues.get("incidenttype");
+sevMap = formValues.get("severity");
+severity_raw = sevMap.get("value");
+description = formValues.get("description");
+reported_by = formValues.get("reportedby");
+// Convert severity to lower-case
+severity = severity_raw.toLowerCase();
+// Timestamp
+now = zoho.currenttime;
+formatted_date = now.toString("dd MMM yyyy, hh:mm a") + " (Asia/Kolkata)";
+logged_at = now.toString("yyyy-MM-dd HH:mm:ss");
+// Improved Incident ID
+incident_id = "INC-" + now.toString("yyyy-MM-dd-HHmmss");
+// Severity Color Mapping
+severity_display = "";
+if(severity == "critical")
+{
+	severity_display = "CRITICAL 🔴";
+}
+else if(severity == "high")
+{
+	severity_display = "HIGH 🟠";
+}
+else if(severity == "medium")
+{
+	severity_display = "MEDIUM 🟡";
+}
+else if(severity == "low")
+{
+	severity_display = "LOW 🟢";
+}
+else
+{
+	severity_display = severity.toUpperCase();
+}
+// Store data in DB
+values_map = Map();
+values_map.put("incidentid",incident_id);
+values_map.put("incidenttype",incident_type);
+values_map.put("severity",severity);
+values_map.put("description",description + "\n\nLogged At: " + logged_at);
+values_map.put("date",formatted_date);
+values_map.put("reportedby",reported_by);
+// INSERT INTO DB
+createResp = zoho.cliq.createRecord("secopsdeskincidents",values_map);
+if(createResp.get("status") != "SUCCESS")
+{
+	response.put("text","❌ Error: Could not save incident to SecOps Desk Database");
+	return response;
+}
+// ===============================
+// BOT REPLY TO USER
+// ===============================
+msg = "==============================\n" + "SecOps Desk — Incident Confirmation\n" + "==============================\n" + "Incident ID     : " + incident_id + "\n" + "Severity Level  : " + severity_display + "\n" + "Incident Type   : " + incident_type + "\n" + "Reported By     : " + reported_by + "\n" + "Date & Time     : " + formatted_date + "\n" + "Status          : Successfully Logged ✅\n" + "━━━━━━━━━━━━━━━━━━\n" + "Description:\n" + description + "\n" + "━━━━━━━━━━━━━━━━━━\n" + "Next Steps      : Incident logged in SecOps Desk\n" + "                  Team has been notified\n" + "==============================";
+response.put("text",msg);
+// ===============================
+// PROFESSIONAL REPORT CARD TO COMMUNITY CHANNEL
+// ===============================
+communityChannelName = "secopsdeskcommunity";
+communityMessage = "```\n";
+communityMessage = communityMessage + "==============================\n";
+communityMessage = communityMessage + "SecOps Desk — Security Incident Report\n";
+communityMessage = communityMessage + "==============================\n";
+communityMessage = communityMessage + "Incident ID     : " + incident_id + "\n";
+communityMessage = communityMessage + "Severity Level  : " + severity_display + "\n";
+communityMessage = communityMessage + "Incident Type   : " + incident_type + "\n";
+communityMessage = communityMessage + "Reported By     : " + reported_by + "\n";
+communityMessage = communityMessage + "Date & Time     : " + formatted_date + "\n";
+communityMessage = communityMessage + "Status          : Logged\n";
+communityMessage = communityMessage + "━━━━━━━━━━━━━━━━━━\n";
+communityMessage = communityMessage + "Description:\n";
+communityMessage = communityMessage + description + "\n";
+communityMessage = communityMessage + "━━━━━━━━━━━━━━━━━━\n";
+communityMessage = communityMessage + "Report Status   : Completed\n";
+communityMessage = communityMessage + "==============================\n";
+communityMessage = communityMessage + "```";
+// Post to community
+postResp = zoho.cliq.postToChannel(communityChannelName,communityMessage);
+info postResp;
+return response;

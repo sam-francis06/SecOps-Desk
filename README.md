@@ -1,8 +1,5 @@
 # SecOps Desk – Zoho Cliq SOC Assistant
 
-<img width="1536" height="560" alt="banner" src="https://github.com/user-attachments/assets/ee80bb16-1357-41ae-8bd7-0f7614a02be3" />
-
-
 SecOps Desk is a Zoho Cliq Security Operations Assistant designed to streamline security operations by providing threat scanning, cybersecurity news updates, CVE lookups, incident management, and SOC analytics inside Zoho Cliq.
 
 This extension integrates multiple industry-standard threat intelligence services including VirusTotal, AbuseIPDB, WhoisXML, MITRE CVE and GNews.

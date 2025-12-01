@@ -121,6 +121,6 @@ This project is licensed under the MIT License.
 
 ## Author
 
-**Francis Samuvel**
+**Francis Samuvel** and
 **Lohitha**
 Developer of SecOps Desk
